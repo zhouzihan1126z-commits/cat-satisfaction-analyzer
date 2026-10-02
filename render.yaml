@@ -1,0 +1,11 @@
+# Render Blueprint —— 猫咪家庭满意度指数分析器
+# 使用方式：在 Render 控制台「New + Blueprint」连接包含本文件的 GitHub 仓库
+services:
+  - type: web
+    name: cat-satisfaction-analyzer
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: gunicorn webapp:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    autoDeploy: true
+    healthCheckPath: /

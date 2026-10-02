@@ -1,0 +1,31 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ===== 构建产物 =====
+build/
+dist/
+*.spec
+
+# ===== 输出与个人数据 =====
+output/
+user_data.json
+
+# ===== 系统文件 =====
+.DS_Store
+
+# ===== 临时处理脚本（下划线前缀的中间产物，仅本地使用）=====
+_*.py
+
+# ===== 中间帧产物（仅保留开场动画所需的 cat0~cat3）=====
+static/_frames/*
+!static/_frames/cat0.png
+!static/_frames/cat1.png
+!static/_frames/cat2.png
+!static/_frames/cat3.png
+
+# ===== 字体预览图（仅保留 Zpix 字体文件本身）=====
+static/fonts/_cat_check.png
+static/fonts/_whitecat_preview.png

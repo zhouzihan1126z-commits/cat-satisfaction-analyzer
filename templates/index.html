@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>🐱 猫咪家庭满意度指数分析器</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #7dd3fc;
+  --card: #ffffff;
+  --ink: #3b2f2f;
+  --muted: #5b6770;
+  --accent: #f97316;
+  --accent-soft: #fed7aa;
+  --green: #10b981;
+  --blue: #3b82f6;
+  --red: #ef4444;
+  --gold: #f59e0b;
+  --sky1: #38bdf8;
+  --sky2: #7dd3fc;
+  --radius: 0px;
+  --shadow: 6px 6px 0 rgba(2, 132, 199, 0.22);
+  --border: 3px solid #ffffff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'PixelZh', 'PingFang SC', 'Hiragino Sans GB', monospace;
+  background: linear-gradient(180deg, #38bdf8 0%, #7dd3fc 42%, #bae6fd 76%, #e0f2fe 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  min-height: 100vh;
+  padding-bottom: 48px;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px;
+  margin-bottom: 22px;
+}
+.report-title { font-size: 26px; font-weight: 800; letter-spacing: 4px; text-align: center; justify-self: center; text-shadow: 2px 2px 0 rgba(255,255,255,.8); }
+.topbar-side { display: flex; align-items: center; justify-content: flex-start; justify-self: start; }
+.toolbar { display: flex; align-items: center; gap: 16px; justify-content: flex-end; justify-self: end; }
+.btn-report {
+  background: transparent; border: none; box-shadow: none; cursor: pointer; padding: 0;
+  font-family: inherit; font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: 2px;
+  transition: transform .12s ease, opacity .12s ease;
+}
+.btn-report:hover { transform: translateY(-1px); color: var(--accent); }
+.btn-report:active { transform: scale(.94); }
+.btn-music { background: transparent; border: none; box-shadow: none; padding: 0; cursor: pointer; display: inline-flex; transition: transform .12s ease; }
+.btn-music:hover { transform: scale(1.1); }
+.btn-music:active { transform: scale(.94); }
+.music-icon { width: 46px; height: 46px; image-rendering: pixelated; display: block; }
+.quiz-music { position: fixed; top: 14px; right: 16px; z-index: 9995; }
+#noteLayer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+#confettiCanvas { position: fixed; inset: 0; pointer-events: none; z-index: 9998; }
+.flow-note {
+  position: absolute; background: url('/static/icons/note.png') center/contain no-repeat;
+  image-rendering: pixelated; opacity: 0;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px rgba(255,255,255,.9));
+  animation: noteFlow 1.6s ease-out forwards;
+}
+@keyframes noteFlow {
+  0% { opacity: 0; transform: translate(0, 0) scale(.4); }
+  15% { opacity: .95; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(var(--rot)); }
+}
+
+/* ---------- Hero：综合指数 ---------- */
+.hero {
+  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.94); border: var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 28px 30px; margin-bottom: 22px;
+}
+.score-ring-wrap { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
+.score-ring { transform: rotate(-90deg); }
+.score-ring .track { fill: none; stroke: #f5e9df; stroke-width: 14; }
+.score-ring .fill {
+  fill: none; stroke: url(#ringGrad); stroke-width: 14; stroke-linecap: round;
+  transition: stroke-dashoffset .8s cubic-bezier(.22,1,.36,1);
+}
+.ring-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.ring-center .num { font-size: 42px; font-weight: 800; line-height: 1; }
+.ring-center .label { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.hero-info { flex: 1; min-width: 260px; }
+.grade {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px;
+  font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.15);
+}
+.grade .tag { font-size: 12px; font-weight: 600; opacity: .9; background: rgba(255,255,255,.25); padding: 2px 8px; border-radius: 999px; }
+.hero-desc { font-size: 15px; color: #6b5b52; line-height: 1.6; }
+.projection {
+  margin-top: 14px; padding: 12px 16px; border-radius: 0; background: #f0fdf4; border: 2px solid #ffffff;
+  box-shadow: 3px 3px 0 rgba(2, 132, 199, 0.16); font-size: 14px; color: #166534;
+}
+.projection b { font-size: 18px; }
+
+/* ---------- 结果页：猫咪坠落 + 评语气泡 ---------- */
+.cat-land { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
+.cat-fall { position: relative; width: 110px; height: 96px; }
+.cat-fall img {
+  width: 96px; height: 96px; object-fit: contain;
+  image-rendering: pixelated; opacity: 0;
+}
+.cat-land.drop .cat-fall img {
+  opacity: 1;
+  animation: catDrop .85s cubic-bezier(.3, 1.15, .45, 1) forwards;
+}
+@keyframes catDrop {
+  0%   { transform: translateY(-360px) rotate(26deg); opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { transform: translateY(0) rotate(-8deg) scale(1.06); }
+  70%  { transform: translateY(-18px) rotate(3deg) scale(1); }
+  85%  { transform: translateY(0) rotate(0) scale(1.02); }
+  100% { transform: translateY(0) rotate(0) scale(1); }
+}
+.cat-fall::after {
+  content: ''; position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%);
+  width: 54px; height: 8px; border-radius: 50%;
+  background: rgba(2, 132, 199, .22); opacity: 0;
+}
+.cat-land.drop .cat-fall::after {
+  animation: shadowIn .85s ease forwards;
+}
+@keyframes shadowIn {
+  0%   { opacity: 0; transform: translateX(-50%) scale(.4); }
+  55%  { opacity: 1; transform: translateX(-50%) scale(1.15); }
+  75%  { opacity: 1; transform: translateX(-50%) scale(.85); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+.cat-bubble {
+  position: relative; max-width: 280px; min-width: 220px;
+  background: #fff; border: 3px solid #3b2f2f;
+  padding: 12px 14px; box-shadow: 5px 5px 0 rgba(2, 132, 199, .22);
+  opacity: 0; transform: scale(.5); transform-origin: top center;
+}
+.cat-bubble::before {
+  content: ''; position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 10px solid transparent; border-right: 10px solid transparent;
+  border-bottom: 13px solid #3b2f2f;
+}
+.cat-bubble::after {
+  content: ''; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-bottom: 11px solid #fff;
+}
+.cat-land.drop .cat-bubble {
+  animation: bubblePop .45s cubic-bezier(.3, 1.6, .5, 1) .55s forwards;
+}
+@keyframes bubblePop {
+  from { opacity: 0; transform: scale(.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.bubble-label { font-size: 13px; font-weight: 800; color: var(--accent); letter-spacing: 2px; margin-bottom: 5px; }
+.bubble-comment { font-size: 13px; line-height: 1.55; color: #4b3b38; margin: 0; }
+
+/* ---------- 证书 ---------- */
+.cert-section { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 20px 0 6px; }
+.btn-cert {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff;
+  border: 3px solid #ffffff; border-radius: 0;
+  padding: 14px 38px; font-family: inherit; font-size: 20px; font-weight: 800; letter-spacing: 4px;
+  cursor: pointer; box-shadow: var(--shadow);
+  transition: transform .12s ease;
+}
+.btn-cert:hover { transform: translateY(-2px); }
+.btn-cert:active { transform: scale(.95); }
+.cert-hint { font-size: 13px; color: var(--muted); }
+
+.cert-modal { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
+.cert-modal.show { display: flex; }
+.cert-backdrop { position: absolute; inset: 0; background: rgba(20, 30, 40, .6); }
+.cert-card {
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 16px;
+  animation: certPop .35s cubic-bezier(.3, 1.5, .5, 1);
+}
+@keyframes certPop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+.cert-img {
+  width: auto; height: auto; max-width: min(84vw, 430px); max-height: 72vh;
+  border: 4px solid #ffffff; box-shadow: var(--shadow); background: #fff;
+}
+.cert-close {
+  position: absolute; top: -14px; right: -14px; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--ink); color: #fff; border: 3px solid #fff; cursor: pointer;
+  font-family: inherit; font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: transform .12s ease;
+}
+.cert-close:hover { transform: scale(1.1); }
+.btn-cert-save {
+  background: var(--ink); color: #fff; text-decoration: none;
+  border: 3px solid #ffffff; border-radius: 0; padding: 11px 28px;
+  font-size: 16px; font-weight: 700; letter-spacing: 3px; box-shadow: var(--shadow);
+  transition: transform .12s ease; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-cert-save:hover { transform: translateY(-2px); }
+.btn-cert-save:active { transform: scale(.95); }
+
+/* ---------- 立绘海报环节：黑幕 → 海报 pop-up ---------- */
+#posterOverlay {
+  position: fixed; inset: 0; z-index: 9997;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #000; padding: 24px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .65s ease;
+}
+#posterOverlay.show { opacity: 1; pointer-events: auto; }
+.poster-img {
+  width: auto; height: auto; max-width: min(80vw, 520px); max-height: 68vh;
+  object-fit: contain; background: transparent;
+  border: none; filter: drop-shadow(0 12px 34px rgba(0,0,0,.75));
+  opacity: 0; transform: scale(.3);
+  transition: transform .55s cubic-bezier(.34, 1.56, .64, 1), opacity .4s ease;
+}
+#posterOverlay.show .poster-img {
+  opacity: 1; transform: scale(1);
+  transition-delay: .3s;
+}
+.btn-view-report {
+  margin-top: 34px; font-family: inherit; font-size: 18px; font-weight: 800; letter-spacing: 4px;
+  color: #fff; background: var(--accent); border: 3px solid #fff; border-radius: 0;
+  padding: 14px 38px; cursor: pointer; box-shadow: 0 6px 0 rgba(255,255,255,.22);
+  opacity: 0; transform: translateY(18px);
+  transition: transform .2s ease, opacity .45s ease, box-shadow .12s ease, background .12s ease;
+}
+#posterOverlay.show .btn-view-report {
+  opacity: 1; transform: translateY(0);
+  transition-delay: .85s;
+}
+.btn-view-report:hover { transform: translateY(-2px); box-shadow: 0 9px 0 rgba(255,255,255,.22); background: #e8620a; }
+.btn-view-report:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(255,255,255,.22); }
+
+/* ---------- 主布局 ---------- */
+.layout { display: grid; grid-template-columns: 1fr; gap: 22px; }
+.panel { background: rgba(255, 255, 255, 0.94); border: var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; }
+.panel h2 { font-size: 17px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.panel h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+/* ---------- 维度输入卡片 ---------- */
+.dim-card { border: 1px solid #f3e6da; border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+.dim-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 16px; cursor: pointer; user-select: none; background: #fffdfa;
+}
+.dim-head:hover { background: #fff7ed; }
+.dim-title { display: flex; align-items: center; gap: 10px; }
+.dim-title .emoji { font-size: 20px; }
+.dim-title .name { font-weight: 700; font-size: 15px; }
+.dim-title .weight { font-size: 12px; color: var(--muted); background: #f5e9df; padding: 2px 8px; border-radius: 8px; }
+.dim-avg { display: flex; align-items: center; gap: 8px; }
+.dim-avg .avg-num { font-weight: 800; font-size: 16px; }
+.chevron { transition: transform .25s ease; color: var(--muted); }
+.dim-card.open .chevron { transform: rotate(180deg); }
+.dim-body { display: none; padding: 6px 16px 16px; }
+.dim-card.open .dim-body { display: block; }
+.dim-summary { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; padding-left: 30px; }
+
+/* 滑杆 */
+.indicator { padding: 10px 0 10px 30px; border-top: 1px dashed #f6ece3; }
+.indicator:first-of-type { border-top: none; }
+.ind-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ind-name { font-size: 14px; font-weight: 600; }
+.ind-desc { font-size: 12px; color: var(--muted); margin: 3px 0 8px; line-height: 1.5; }
+.ind-val { font-weight: 800; font-size: 14px; min-width: 34px; text-align: right; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none; flex: 1; height: 8px; border-radius: 8px;
+  background: #f3e6da; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  transition: border-color .2s;
+}
+input[type=range]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); cursor: pointer;
+}
+
+/* ---------- 结果面板 ---------- */
+.chart-box { position: relative; height: 300px; margin-bottom: 10px; }
+.chart-caption { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 18px; }
+.weak-list { display: flex; flex-direction: column; gap: 12px; }
+.weak-item { border: 2px solid #ffffff; border-radius: 0; padding: 14px 16px; background: #ffffff; box-shadow: 3px 3px 0 rgba(2, 132, 199, 0.16); }
+.weak-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.weak-name { font-weight: 700; font-size: 14.5px; }
+.weak-score { font-weight: 800; font-size: 15px; }
+.weak-cat { font-size: 11px; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 8px; }
+.weak-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.tip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12.5px; }
+.tip-grid div { color: #6b5b52; line-height: 1.45; }
+.tip-grid .k { color: var(--accent); font-weight: 700; }
+.empty-tip { text-align: center; color: var(--muted); padding: 20px; font-size: 14px; }
+
+footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
+
+/* ---------- 开场像素动画 ---------- */
+#intro {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(180deg, #38bdf8 0%, #7dd3fc 42%, #bae6fd 76%, #e0f2fe 100%);
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: hidden;
+  transition: opacity .65s ease;
+}
+#intro.fade-out { opacity: 0; pointer-events: none; }
+#skyCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.intro-content {
+  position: relative; z-index: 2; text-align: center;
+  padding: calc(8vh + 30px) 22px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 30px;
+}
+
+@font-face {
+  font-family: 'PixelZh';
+  src: url('/static/fonts/Zpix-fixed.ttf') format('truetype');
+  font-weight: normal; font-style: normal; font-display: swap;
+}
+
+.pixel-title {
+  font-family: 'PixelZh', 'PingFang SC', monospace;
+  font-size: clamp(42px, 9vw, 96px);
+  font-weight: normal; letter-spacing: .03em; line-height: 1.28;
+  color: #fde047;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+  animation: titleFloat 3.2s ease-in-out infinite;
+}
+.pixel-title .ch { display: inline-block; animation: titlePop .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes titlePop {
+  0% { transform: translateY(46px) scale(.3); opacity: 0; }
+  60% { transform: translateY(-6px) scale(1.12); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes titleFloat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+
+.intro-sub {
+  font-size: 14px; letter-spacing: .16em; color: #0c4a6e; font-weight: 600;
+  opacity: 0; animation: fadeUp .5s ease 1.25s forwards;
+}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+.start-btn {
+  position: relative;
+  font-family: 'PixelZh', 'PingFang SC', monospace;
+  font-size: 15px; font-weight: normal; letter-spacing: .08em;
+  color: #713f12; cursor: pointer;
+  padding: 11px 30px;
+  background: rgba(253, 224, 71, 0.5);
+  border: 2px solid rgba(255, 251, 235, 0.85); border-radius: 4px;
+  box-shadow: 0 4px 0 rgba(146, 64, 14, 0.55), 0 10px 20px rgba(2,132,199,.16);
+  backdrop-filter: blur(3px);
+  text-shadow: 0 1px 0 rgba(255,255,255,.45);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  animation: btnBounce 1.9s ease-in-out infinite;
+}
+.start-btn:hover { background: rgba(253, 224, 71, 0.7); transform: translateY(-2px); box-shadow: 0 6px 0 rgba(146, 64, 14, 0.5), 0 14px 24px rgba(2,132,199,.2); }
+.start-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(146, 64, 14, 0.55), 0 4px 10px rgba(2,132,199,.18); }
+@keyframes btnBounce {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+/* 猫咪掉落时飘出的 "喵~" 气泡 */
+.meow-float {
+  position: absolute; z-index: 3; font-family: 'PixelZh', 'PingFang SC', monospace;
+  font-size: 26px; color: #fff; pointer-events: none;
+  -webkit-text-stroke: 2px #0f172a; text-shadow: 0 4px 0 rgba(2,132,199,.5);
+  transform: translate(-50%, -50%);
+  animation: meowRise 1.05s ease-out forwards;
+}
+@keyframes meowRise {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(.3); }
+  20% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -180%) scale(1); }
+}
+
+/* ---------- 测评环节：像素游戏对话框 ---------- */
+#quiz {
+  position: fixed; inset: 0; z-index: 9990;
+  background: linear-gradient(180deg, #38bdf8 0%, #7dd3fc 42%, #bae6fd 76%, #e0f2fe 100%);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+}
+#quiz.show { opacity: 1; pointer-events: auto; }
+#quiz::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 16vh; z-index: 0;
+  background: repeating-linear-gradient(90deg, #fbd79a 0 14px, #f4c67c 14px 28px);
+  border-top: 4px solid #3b2f2f;
+}
+.quiz-stage { position: relative; z-index: 1; width: min(680px, 92vw); display: flex; flex-direction: column; gap: 14px; }
+.quiz-hud { display: flex; align-items: center; gap: 12px; }
+.quiz-progress-label { font-family: 'PixelZh','PingFang SC',monospace; font-size: 15px; color: #0c4a6e; font-weight: 700; text-shadow: 1px 1px 0 rgba(255,255,255,.6); white-space: nowrap; }
+.quiz-progress-bar { flex: 1; height: 14px; background: #fff; border: 3px solid #3b2f2f; border-radius: 0; box-shadow: 2px 2px 0 rgba(2,132,199,.3); overflow: hidden; }
+.quiz-progress-fill { height: 100%; width: 0%; background: #f97316; transition: width .35s cubic-bezier(.22,1,.36,1); }
+.dialog-box {
+  background: #fffdfa; border: 4px solid #3b2f2f; border-radius: 0;
+  box-shadow: 8px 8px 0 rgba(2, 132, 199, 0.35); padding: 18px 20px;
+}
+.dialog-top { display: flex; gap: 14px; align-items: flex-start; }
+.dialog-avatar {
+  flex-shrink: 0; width: 84px; height: 84px; border: 3px solid #3b2f2f; border-radius: 0;
+  background: #fef3c7; box-shadow: 3px 3px 0 rgba(2,132,199,.28); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.dialog-avatar img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; image-rendering: pixelated; display: block; }
+.dialog-text-wrap { flex: 1; min-height: 84px; }
+.dialog-text { font-size: 17px; line-height: 1.6; font-weight: 600; min-height: 1.6em; }
+.dialog-text.typing::after { content: '▼'; color: #f97316; animation: cursorBlink .9s steps(1) infinite; }
+@keyframes cursorBlink { 0%,60% { opacity: 1; } 61%,100% { opacity: 0; } }
+.dialog-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.option-btn {
+  font-family: inherit; text-align: left; font-size: 14px; line-height: 1.4;
+  background: #fff; border: 2px solid #3b2f2f; border-radius: 0;
+  padding: 10px 12px; cursor: pointer; color: var(--ink);
+  box-shadow: 3px 3px 0 rgba(2, 132, 199, 0.28);
+  transition: transform .1s ease, box-shadow .1s ease, background .1s ease;
+  display: flex; align-items: center; gap: 10px;
+}
+.option-btn .key {
+  flex-shrink: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  background: #3b2f2f; color: #fff; font-size: 13px; font-weight: 800;
+}
+.option-btn:hover { background: #fef3c7; transform: translateY(-1px); box-shadow: 3px 5px 0 rgba(2,132,199,.28); }
+.option-btn:active { transform: translateY(1px); box-shadow: 1px 1px 0 rgba(2,132,199,.28); }
+.option-btn.selected { background: #fde68a; border-color: #f97316; box-shadow: 3px 3px 0 rgba(249,115,22,.4); }
+.option-btn.selected .key { background: #f97316; }
+.quiz-nav { display: flex; align-items: center; justify-content: space-between; }
+.quiz-prev {
+  font-family: inherit; font-size: 13px; color: #0c4a6e; background: rgba(255,255,255,.6);
+  border: 2px solid #3b2f2f; border-radius: 0; padding: 7px 14px; cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(2,132,199,.3); transition: transform .1s;
+}
+.quiz-prev:hover { background: #fff; transform: translateY(-1px); }
+.quiz-prev:active { transform: translateY(1px); }
+.quiz-hint { font-size: 12px; color: #0c4a6e; opacity: .75; }
+
+/* 地板上的追逐精灵（循环奔跑动画） */
+.chase-sprite {
+  position: absolute; left: -170px; bottom: 2vh; z-index: 9999;
+  width: 150px; height: 150px;
+  background: url('/static/sprites/chase.png') 0 0 / 400% 100% no-repeat;
+  image-rendering: pixelated; pointer-events: none;
+  animation: chaseRun .5s steps(4) infinite, chaseMove 7s linear infinite;
+}
+@keyframes chaseRun {
+  from { background-position: 0% 0; }
+  to   { background-position: 100% 0; }
+}
+@keyframes chaseMove {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(100vw + 340px)); }
+}
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 768px) {
+  body { padding-bottom: 32px; }
+  .container { padding: 16px 12px; }
+  .topbar { grid-template-columns: auto 1fr auto; gap: 8px; margin-bottom: 16px; }
+  .report-title { font-size: 19px; letter-spacing: 2px; }
+  .music-icon { width: 38px; height: 38px; }
+  .btn-report { font-size: 15px; }
+  .quiz-music { top: max(14px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
+
+  /* Hero 纵向堆叠、居中 */
+  .hero { flex-direction: column; align-items: center; text-align: center; gap: 18px; padding: 20px 16px; }
+  .hero-info { min-width: 0; width: 100%; }
+  .grade { margin: 0 auto 10px; }
+  .hero-desc { text-align: center; }
+
+  .panel { padding: 16px 14px; }
+  .panel h2 { font-size: 15px; }
+  .chart-box { height: 240px; }
+  .tip-grid { grid-template-columns: 1fr; }
+  .weak-top { flex-wrap: wrap; }
+
+  /* 测评环节 */
+  .quiz-stage { width: 94vw; gap: 10px; }
+  .dialog-box { padding: 14px 12px; }
+  .dialog-top { gap: 10px; }
+  .dialog-avatar { width: 56px; height: 56px; }
+  .dialog-text { font-size: 15px; }
+  .dialog-text-wrap { min-height: 64px; }
+  .dialog-options { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+  .option-btn { font-size: 14px; padding: 12px 12px; }
+  .quiz-hint { display: none; }
+  .quiz-prev { font-size: 13px; padding: 8px 14px; }
+  .chase-sprite { width: 96px; height: 96px; left: -110px; }
+
+  /* 海报 & 证书 */
+  .btn-view-report { font-size: 16px; padding: 12px 28px; letter-spacing: 3px; margin-top: 26px; }
+  .poster-img { max-height: 62vh; }
+  .btn-cert { font-size: 17px; padding: 12px 28px; }
+  .btn-cert-save { font-size: 14px; padding: 10px 20px; }
+  .cert-close { width: 32px; height: 32px; top: -12px; right: -12px; }
+  input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; }
+  input[type=range]::-moz-range-thumb { width: 26px; height: 26px; }
+}
+
+@media (max-width: 480px) {
+  .pixel-title { font-size: clamp(34px, 12vw, 52px); }
+  .intro-content { padding: calc(10vh + 20px) 16px 0; gap: 22px; }
+  .start-btn { font-size: 14px; padding: 12px 26px; }
+  .score-ring-wrap { width: 126px; height: 126px; }
+  .score-ring { width: 126px; height: 126px; }
+  .ring-center .num { font-size: 34px; }
+  .chart-box { height: 210px; }
+  .chase-sprite { width: 80px; height: 80px; left: -90px; }
+  .cat-bubble { max-width: 240px; min-width: 0; }
+}
+</style>
+</head>
+<body>
+<!-- 开场像素动画 -->
+<div id="intro">
+  <canvas id="skyCanvas"></canvas>
+  <div class="intro-content">
+    <h1 class="pixel-title" id="pixelTitle">你的猫咪<br>对你家满意吗？</h1>
+    <button class="start-btn" id="btnStart">▶ 开始探索</button>
+  </div>
+</div>
+
+<!-- 测评环节：像素游戏对话框 -->
+<div id="quiz">
+  <div class="chase-sprite" aria-hidden="true"></div>
+  <button class="btn-music quiz-music" id="btnMusicQuiz" aria-label="音乐"><img class="music-icon" src="/static/icons/music_icon.png" alt="音乐"></button>
+  <div class="quiz-stage">
+    <div class="quiz-hud">
+      <span class="quiz-progress-label" id="quizProgress">第 1 / 15 题</span>
+      <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quizProgressFill"></div></div>
+    </div>
+    <div class="dialog-box">
+      <div class="dialog-top">
+        <div class="dialog-avatar"><img src="/static/_frames/cat0.png" alt="猫"></div>
+        <div class="dialog-text-wrap"><div class="dialog-text" id="dialogText"></div></div>
+      </div>
+      <div class="dialog-options" id="dialogOptions"></div>
+    </div>
+    <div class="quiz-nav">
+      <button class="quiz-prev" id="quizPrev">← 上一题</button>
+      <span class="quiz-hint">数字键 1-4 或 A-D 选择</span>
+    </div>
+  </div>
+</div>
+
+<div id="noteLayer"></div>
+<canvas id="confettiCanvas"></canvas>
+
+<!-- 立绘海报环节：黑幕 → 海报 pop-up → 查看报告 -->
+<div id="posterOverlay" role="dialog" aria-modal="true" aria-label="立绘海报">
+  <img class="poster-img" id="posterImg" alt="立绘海报">
+  <button class="btn-view-report" id="btnViewReport">查看报告 ▶</button>
+</div>
+
+<!-- 证书弹层 -->
+<div class="cert-modal" id="certModal" role="dialog" aria-modal="true">
+  <div class="cert-backdrop" id="certBackdrop"></div>
+  <div class="cert-card">
+    <button class="cert-close" id="certClose" aria-label="关闭">✕</button>
+    <img class="cert-img" id="certImg" alt="猫咪家庭满意度证书">
+    <a class="btn-cert-save" id="btnCertSave" download>💾 保存证书</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="topbar-side">
+      <button class="btn-music" id="btnMusic" aria-label="音乐"><img class="music-icon" src="/static/icons/music_icon.png" alt="音乐"></button>
+    </div>
+    <h1 class="report-title">结果报告</h1>
+    <div class="toolbar">
+      <button class="btn-report" id="btnReport">下载</button>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="score-ring-wrap">
+      <svg class="score-ring" width="150" height="150" viewBox="0 0 150 150">
+        <defs>
+          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fb923c"/>
+            <stop offset="100%" stop-color="#f97316"/>
+          </linearGradient>
+        </defs>
+        <circle class="track" cx="75" cy="75" r="64"></circle>
+        <circle class="fill" id="ringFill" cx="75" cy="75" r="64"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="num" id="totalNum">--</div>
+        <div class="label">综合满意度指数</div>
+      </div>
+    </div>
+    <div class="cat-land" id="catLand">
+      <div class="cat-fall">
+        <img id="catFallImg" src="/static/_frames/cat2.png" alt="猫">
+      </div>
+      <div class="cat-bubble" id="catBubble">
+        <div class="bubble-label">🐱 猫咪评语</div>
+        <p class="bubble-comment" id="catComment">喵~</p>
+      </div>
+    </div>
+    <div class="hero-info">
+      <div class="grade" id="gradeBadge"><span>等待评分</span></div>
+      <p class="hero-desc" id="gradeDesc">根据各项指标评估，猫咪的家庭满意度综合结果如下。</p>
+      <div class="projection" id="projection" style="display:none;"></div>
+    </div>
+  </section>
+
+  <!-- 主布局 -->
+  <div class="layout">
+    <!-- 结果 -->
+    <section class="panel">
+      <h2><span class="dot"></span>可视化分析</h2>
+      <div class="chart-box"><canvas id="radarChart"></canvas></div>
+      <p class="chart-caption">六维能力雷达图（橙色 = 当前，绿色 = 优化后预期）</p>
+      <div class="chart-box"><canvas id="barChart"></canvas></div>
+      <p class="chart-caption">各维度平均得分</p>
+
+      <h2 style="margin-top:22px;"><span class="dot"></span>核心短板诊断与改进方案</h2>
+      <div class="weak-list" id="weakList">
+        <div class="empty-tip">暂无短板提示</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="cert-section">
+    <button class="btn-cert" id="btnCert">🏅 领取证书</button>
+    <p class="cert-hint" id="certHint">完成测评后，即可领取对应等级的认证证书～</p>
+  </div>
+
+  <footer>用数据定义猫咪对家庭的满意程度 🐾</footer>
+</div>
+
+<script>
+/* ================= 开场像素动画 ================= */
+// 参考图风格的小白猫（4 帧透明 PNG，提取自参考图精灵表）
+// cat0 站立 / cat1 蹲坐 / cat2 腾空 / cat3 落地
+const CAT_FRAME_NAMES = ['cat0', 'cat1', 'cat2', 'cat3'];
+const CAT_FRAMES = CAT_FRAME_NAMES.map(name => {
+  const img = new Image();
+  img.src = '/static/_frames/' + name + '.png';
+  return img;
+});
+// 站立帧原生高度（像素），用于把 4 个姿态统一缩放到同一只猫的大小
+const CAT_BASE_H = 452;
+// 各动画状态对应帧：idle 站立 / anticipate 蹲坐 / jump 腾空 / land 落地 / fall 站立下落
+const CAT_FRAME_BY_MODE = { idle: 0, anticipate: 1, jump: 2, land: 3, fall: 0 };
+const CLOUD_SPRITE = [
+  '...XXXXXXXX.....',
+  '..XXXXXXXXXXXX..',
+  '.XXXXXXXXXXXXXX.',
+  'XXXXXXXXXXXXXXXX',
+  'XXXXXXXXXXXXXXXX',
+  '.XXXXXXXXXXXXXX.',
+  '..XXXXXXXXXSSS..',
+];
+const CLOUD_PALETTE = { X: '#ffffff', S: '#dbeafe' };
+const SUN_SPRITE = ['..GGG..', '.GGGGG.', 'GGGGGGG', '.GGGGG.', '..GGG..'];
+
+function drawSprite(ctx, sprite, palette, px, ox, oy) {
+  for (let r = 0; r < sprite.length; r++) {
+    const row = sprite[r];
+    for (let c = 0; c < row.length; c++) {
+      const ch = row[c];
+      if (ch === '.' || ch === ' ') continue;
+      ctx.fillStyle = palette[ch] || '#000';
+      ctx.fillRect(Math.floor(ox + c * px), Math.floor(oy + r * px), Math.ceil(px), Math.ceil(px));
+    }
+  }
+}
+
+// 天空场景画布
+const sky = document.getElementById('skyCanvas');
+const sctx = sky.getContext('2d');
+const clouds = [
+  { fx: 0.08, fy: 0.80, s: 1.00, sway: .40, ph: 0 },
+  { fx: 0.26, fy: 0.64, s: 1.10, sway: .50, ph: 1 },
+  { fx: 0.44, fy: 0.78, s: 0.95, sway: .45, ph: 2 },
+  { fx: 0.62, fy: 0.60, s: 1.15, sway: .55, ph: 3 },
+  { fx: 0.80, fy: 0.74, s: 1.00, sway: .50, ph: 4 },
+  { fx: 0.95, fy: 0.58, s: 1.05, sway: .60, ph: 5 },
+  { fx: 0.16, fy: 0.44, s: 0.70, sway: .50, ph: 6 },
+  { fx: 0.70, fy: 0.42, s: 0.75, sway: .55, ph: 7 },
+];
+const sparkles = Array.from({ length: 10 }, (_, i) => ({
+  fx: (i * 0.117 + 0.04) % 1, fy: (i * 0.233 + 0.05) % 1, ph: i, s: (i % 3) + 1,
+}));
+const cat = {
+  ci: 0, mode: 'idle', t: 0,
+  waitDur: 1.0, anticipateDur: 0.32, jumpDur: 0.9, landDur: 0.45,
+  fallT: 0, fallDur: 1.2, fallFromX: 0, fallFromY: 0,
+  blink: 1.4, tailPhase: 0,
+};
+
+function resizeSky() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  sky.width = Math.floor(sky.clientWidth * dpr);
+  sky.height = Math.floor(sky.clientHeight * dpr);
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resizeSky);
+resizeSky();
+
+function updateCat(dt) {
+  cat.t += dt;
+  cat.tailPhase += dt * (cat.mode === 'jump' ? 9 : 6);
+  cat.blink += dt;
+  const seq = ['idle', 'anticipate', 'jump', 'land'];
+  const durs = { idle: cat.waitDur, anticipate: cat.anticipateDur, jump: cat.jumpDur, land: cat.landDur };
+  if (cat.t >= durs[cat.mode]) {
+    cat.t = 0;
+    if (cat.mode === 'jump') cat.ci = (cat.ci + 1) % clouds.length;
+    cat.mode = seq[(seq.indexOf(cat.mode) + 1) % seq.length];
+  }
+}
+
+function drawKitten(cx, feetY, cpx, o = {}) {
+  const idx = CAT_FRAME_BY_MODE[cat.mode] != null ? CAT_FRAME_BY_MODE[cat.mode] : 0;
+  const img = CAT_FRAMES[idx] || CAT_FRAMES[0];
+  if (!img.complete || !img.naturalWidth) return { bodyW: 0, bodyH: 0 };
+  const H = 32 * cpx;               // 站立猫目标高度
+  const k = H / CAT_BASE_H;         // 统一缩放系数，保持各姿态真实相对大小
+  const bodyW = img.naturalWidth * k;
+  const bodyH = img.naturalHeight * k;
+  sctx.save();
+  sctx.translate(cx, feetY);
+  if (o.rot) sctx.rotate(o.rot);
+  sctx.scale(o.sx || 1, o.sy || 1);
+  sctx.imageSmoothingEnabled = false; // 像素风：邻近采样保持清晰
+  sctx.drawImage(img, -bodyW / 2, -bodyH, bodyW, bodyH);
+  sctx.restore();
+  return { bodyW, bodyH };
+}
+
+let tops = [];
+
+function drawScene(t, dt) {
+  const w = sky.clientWidth, h = sky.clientHeight;
+  sctx.clearRect(0, 0, w, h);
+
+  // 太阳
+  drawSprite(sctx, SUN_SPRITE, { G: '#fde047' }, 6, w * 0.82, h * 0.08);
+
+  // 云朵
+  tops = [];
+  for (const c of clouds) {
+    const cpx = Math.max(4, Math.round(6 * c.s));
+    const x = (c.fx + Math.sin(t * c.sway + c.ph) * 0.025) * w;
+    const topY = c.fy * h;
+    const cw = CLOUD_SPRITE[0].length * cpx;
+    drawSprite(sctx, CLOUD_SPRITE, CLOUD_PALETTE, cpx, x - cw / 2, topY);
+    tops.push({ x, topY });
+  }
+
+  // 闪光点
+  for (const sp of sparkles) {
+    const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 2 + sp.ph));
+    sctx.fillStyle = `rgba(255,255,255,${a.toFixed(2)})`;
+    sctx.fillRect(Math.floor(sp.fx * w), Math.floor(sp.fy * h), sp.s * 3, sp.s * 3);
+  }
+
+  // 小猫
+  const cpx = Math.min(5, Math.max(3, Math.round(w / 95)));
+  if (cat.mode === 'fall') {
+    drawFallingCat(dt, cpx, h);
+    return;
+  }
+
+  updateCat(dt);
+  const N = clouds.length;
+  const a = tops[cat.ci];
+  const b = tops[(cat.ci + 1) % N];
+  let cx, feetY, sx = 1, sy = 1, rot = 0;
+  const blinking = (cat.blink % 3.4) < 0.13;
+
+  if (cat.mode === 'idle') {
+    const p = cat.t / cat.waitDur;
+    cx = a.x;
+    feetY = a.topY + Math.sin(p * Math.PI * 3) * 2.5;
+    sx = 1 + Math.sin(p * Math.PI * 3) * 0.025;
+    sy = 1 - Math.sin(p * Math.PI * 3) * 0.04;
+  } else if (cat.mode === 'anticipate') {
+    const p = cat.t / cat.anticipateDur;
+    cx = a.x; feetY = a.topY;
+    sx = 1 + p * 0.14; sy = 1 - p * 0.16;
+  } else if (cat.mode === 'jump') {
+    const p = cat.t / cat.jumpDur;
+    const ease = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    const air = Math.sin(ease * Math.PI);
+    cx = a.x + (b.x - a.x) * ease;
+    feetY = a.topY + (b.topY - a.topY) * ease - air * 0.16 * h;
+    sy = 1 + air * 0.12; sx = 1 - air * 0.08;
+    rot = (b.x >= a.x ? 1 : -1) * air * 0.18;
+  } else {
+    const p = cat.t / cat.landDur;
+    const bounce = Math.sin(p * Math.PI);
+    cx = a.x; feetY = a.topY;
+    sx = 1 + bounce * 0.15; sy = 1 - bounce * 0.18;
+  }
+
+  drawKitten(cx, feetY, cpx, { sx, sy, rot, blink: blinking });
+}
+
+function drawFallingCat(dt, cpx, h) {
+  cat.fallT += dt;
+  cat.tailPhase += dt * 10;
+  const p = Math.min(cat.fallT / cat.fallDur, 1);
+  const ease = p * p; // 重力加速
+  const targetY = h + 80; // 掉出画面底部
+  const cy = cat.fallFromY + (targetY - cat.fallFromY) * ease;
+  const cx = cat.fallFromX;
+  const rot = ease * 0.65;
+  const shrink = 1 - ease * 0.32;
+  drawKitten(cx, cy, cpx, { sx: shrink, sy: shrink, rot });
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  drawScene(now / 1000, dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// 标题逐字弹出
+const titleEl = document.getElementById('pixelTitle');
+const titleLines = titleEl.innerHTML.split('<br>');
+titleEl.innerHTML = titleLines.map(line =>
+  Array.from(line).map((c, i) => `<span class="ch" style="animation-delay:${(0.15 + i * 0.06).toFixed(2)}s">${c}</span>`).join('')
+).join('<br>');
+
+// 合成 "喵~" 音效（Web Audio API，无需外部音频文件）
+let _audioCtx = null;
+function playMeow() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!_audioCtx) _audioCtx = new Ctx();
+    const ctx = _audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    const dur = 0.55;
+
+    // 主音：锯齿波，起始较高后下滑（喵的核心滑音）
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(720, now);
+    osc.frequency.exponentialRampToValueAtTime(560, now + 0.16);
+    osc.frequency.exponentialRampToValueAtTime(640, now + 0.28);
+    osc.frequency.exponentialRampToValueAtTime(400, now + dur);
+
+    // 颤音，让音色更接近真猫
+    const vib = ctx.createOscillator();
+    const vibGain = ctx.createGain();
+    vib.frequency.value = 22;
+    vibGain.gain.value = 16;
+    vib.connect(vibGain);
+    vibGain.connect(osc.frequency);
+
+    // 音量包络：快速起音 → 渐弱
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
+    gain.gain.setValueAtTime(0.25, now + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    // 低通滤波柔化音色
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1600;
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + dur + 0.05);
+    vib.start(now);
+    vib.stop(now + dur + 0.05);
+  } catch (e) { /* 静默忽略音频错误 */ }
+}
+
+// ===== 像素风背景音乐（8-bit 芯片音，类马力欧的欢快旋律）=====
+function noteFreq(m) { return m == null ? 0 : 440 * Math.pow(2, (m - 69) / 12); }
+
+// 32 步旋律（每步 = 八分音符，null 为休止），上行再回落的轻快弧线
+const BGM_MELODY = [
+  76, 79, 84, null, 79, 76, 84, null,
+  74, 77, 81, null, 77, 74, 81, null,
+  76, 79, 84, 86,   84, 79, 76, null,
+  77, 74, 72, null, null, null, null, null,
+];
+// 贝斯：每拍一个根音（C / A / F / G 进行）
+const BGM_BASS = [
+  48, null, 48, null, 48, null, 48, null,
+  45, null, 45, null, 45, null, 45, null,
+  41, null, 41, null, 41, null, 41, null,
+  43, null, 43, null, 43, null, 43, null,
+];
+
+const BGM = {
+  playing: false, step: 0, nextTime: 0,
+  bpm: 132, master: null, timer: null, noiseBuf: null,
+};
+
+function playBGMStep(step, t) {
+  const ctx = _audioCtx;
+  const stepDur = 60 / BGM.bpm / 2;
+  // 主旋律：方波，轻快明亮
+  const m = BGM_MELODY[step];
+  if (m != null) {
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = noteFreq(m);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.45, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + stepDur * 0.85);
+    o.connect(g); g.connect(BGM.master);
+    o.start(t); o.stop(t + stepDur);
+  }
+  // 贝斯：三角波，浑厚
+  const b = BGM_BASS[step];
+  if (b != null) {
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = noteFreq(b);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.7, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + stepDur * 0.95);
+    o.connect(g); g.connect(BGM.master);
+    o.start(t); o.stop(t + stepDur);
+  }
+  // 反拍噪声鼓点：短促像素节奏
+  if (step % 2 === 1) {
+    const src = ctx.createBufferSource();
+    src.buffer = BGM.noiseBuf;
+    const g = ctx.createGain();
+    g.gain.value = 0.16;
+    const f = ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.value = 6000;
+    src.connect(f); f.connect(g); g.connect(BGM.master);
+    src.start(t);
+  }
+}
+
+function scheduleBGM() {
+  const ctx = _audioCtx;
+  const stepDur = 60 / BGM.bpm / 2;
+  while (BGM.nextTime < ctx.currentTime + 0.18) {
+    playBGMStep(BGM.step, BGM.nextTime);
+    BGM.nextTime += stepDur;
+    BGM.step = (BGM.step + 1) % 32;
+  }
+}
+
+function startBGM() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!_audioCtx) _audioCtx = new Ctx();
+    const ctx = _audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    if (BGM.playing) return;
+    BGM.master = ctx.createGain();
+    BGM.master.gain.value = 0.16;
+    BGM.master.connect(ctx.destination);
+    // 预生成噪声缓冲
+    const len = Math.floor(ctx.sampleRate * 0.03);
+    BGM.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = BGM.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    BGM.step = 0;
+    BGM.nextTime = ctx.currentTime + 0.05;
+    BGM.playing = true;
+    BGM.timer = setInterval(scheduleBGM, 40);
+    updateMusicBtn();
+    startNoteFlow();
+  } catch (e) { /* 静默忽略音频错误 */ }
+}
+
+function stopBGM() {
+  if (!BGM.playing) return;
+  BGM.playing = false;
+  if (BGM.timer) { clearInterval(BGM.timer); BGM.timer = null; }
+  if (BGM.master) {
+    try { BGM.master.gain.setTargetAtTime(0.0001, _audioCtx.currentTime, 0.1); } catch (e) {}
+    BGM.master = null;
+  }
+  updateMusicBtn();
+  stopNoteFlow();
+}
+
+function toggleBGM() { BGM.playing ? stopBGM() : startBGM(); }
+
+function updateMusicBtn() {
+  document.querySelectorAll('.btn-music .music-icon').forEach(icon => {
+    icon.style.opacity = BGM.playing ? '1' : '.4';
+  });
+}
+
+const noteLayer = document.getElementById('noteLayer');
+let noteTimer = null;
+function spawnMusicNote() {
+  if (!noteLayer) return;
+  const quiz = document.getElementById('quiz');
+  const quizBtn = document.getElementById('btnMusicQuiz');
+  let b = document.getElementById('btnMusic');
+  if (quiz && quiz.classList.contains('show') && quizBtn) b = quizBtn;
+  if (!b) return;
+  const r = b.getBoundingClientRect();
+  const n = document.createElement('div');
+  n.className = 'flow-note';
+  const size = 10 + Math.random() * 14;
+  n.style.width = size + 'px';
+  n.style.height = size + 'px';
+  n.style.left = (r.left + r.width / 2 + (Math.random() * 26 - 13)) + 'px';
+  n.style.top = (r.top + r.height / 2) + 'px';
+  n.style.setProperty('--dx', (Math.random() * 70 - 35) + 'px');
+  n.style.setProperty('--dy', (-60 - Math.random() * 60) + 'px');
+  n.style.setProperty('--rot', (Math.random() * 40 - 20) + 'deg');
+  n.style.animationDuration = (1.1 + Math.random() * 0.9) + 's';
+  noteLayer.appendChild(n);
+  setTimeout(() => n.remove(), 2200);
+}
+function startNoteFlow() {
+  stopNoteFlow();
+  spawnMusicNote();
+  noteTimer = setInterval(spawnMusicNote, 380);
+}
+function stopNoteFlow() {
+  if (noteTimer) { clearInterval(noteTimer); noteTimer = null; }
+}
+
+document.getElementById('btnMusic').addEventListener('click', toggleBGM);
+document.getElementById('btnMusicQuiz').addEventListener('click', toggleBGM);
+
+// ===== 测评数据：15 题 → 22 项指标（分组映射；同指标多题映射时取平均） =====
+const QUIZ = [
+  // —— 维度一：饮食（3 题） ——
+  { q: '猫咪日常进食状态与肠胃情况？', maps: ['diet_food'], options: [
+    { t: '每餐主动吃光、食欲稳定，肠胃健康无软便呕吐', s: 9 },
+    { t: '基本能吃完、偶尔剩少量粮，肠胃基本稳定', s: 7 },
+    { t: '挑食剩饭需哄喂，偶有软便、肠胃不适', s: 5 },
+    { t: '长期拒食挑食，频繁呕吐腹泻、肠胃不健康', s: 3 },
+  ]},
+  { q: '猫咪饮水习惯与零食投喂方式？', maps: ['diet_water', 'diet_snack'], options: [
+    { t: '主动频繁喝水，零食定时定量投喂，绝不过量', s: 9 },
+    { t: '日常喝水正常，零食偶尔投喂，总量可控', s: 7 },
+    { t: '喝水偏少不爱主动饮水，零食投喂随意无规律', s: 5 },
+    { t: '极少主动喝水，零食随手乱喂，经常挤占正餐', s: 3 },
+  ]},
+  { q: '猫咪食盆、水盆摆放与清洁环境？', maps: ['diet_env'], options: [
+    { t: '摆放安静避光、远离猫砂盆，每日清洁无异味', s: 9 },
+    { t: '位置固定安静，定期清洁，环境无干扰', s: 7 },
+    { t: '位置偶尔挪动，环境轻微嘈杂，清洁不规律', s: 5 },
+    { t: '摆放嘈杂区域，靠近猫砂盆，长期不清洁有异味', s: 3 },
+  ]},
+  // —— 维度二：居住环境（3 题） ——
+  { q: '猫咪休憩空间与躲藏环境？', maps: ['env_rest'], options: [
+    { t: '多处休息点位，有专属封闭窝，温暖安静无打扰', s: 9 },
+    { t: '有固定猫窝与休息角落，环境基本舒适', s: 7 },
+    { t: '仅有简易垫子，无私密躲藏空间，容易被打扰', s: 5 },
+    { t: '无专属休息区域，休息位置嘈杂、冬冷夏热', s: 3 },
+  ]},
+  { q: '猫砂盆数量与清洁整洁度？', maps: ['env_toilet'], options: [
+    { t: '数量充足、每日清理，无异味、无脏污堆积', s: 9 },
+    { t: '数量够用，隔天清理，基本无明显异味', s: 7 },
+    { t: '数量刚好匹配猫咪，2-3天清理一次，轻微异味', s: 5 },
+    { t: '数量不足、长期不清理，异味浓重、脏乱不堪', s: 3 },
+  ]},
+  { q: '居家温湿度与噪音干扰情况？', maps: ['env_climate', 'env_quiet'], options: [
+    { t: '四季温湿适宜、环境安静，猫咪体感舒适不惊扰', s: 9 },
+    { t: '大部分时间舒适，仅偶尔轻微噪音干扰', s: 7 },
+    { t: '夏热冬冷无调节，日常噪音较多、常被打扰', s: 5 },
+    { t: '温差极大、长期嘈杂喧闹，猫咪频繁应激躲闭', s: 3 },
+  ]},
+  // —— 维度三：安全保障（2 题） ——
+  { q: '居家安全防护与隐患排查？', maps: ['safe_protect'], options: [
+    { t: '全屋封窗，电线、有毒物品、尖锐物全部收纳无隐患', s: 9 },
+    { t: '核心区域防护到位，仅有极少可忽略小隐患', s: 7 },
+    { t: '部分防护缺失，存在少量安全风险', s: 5 },
+    { t: '几乎无防护，坠窗、误食、受伤风险极高', s: 3 },
+  ]},
+  { q: '猫咪应激、陌生访客等带来的压力？', maps: ['safe_stress', 'safe_outing'], options: [
+    { t: '情绪稳定、访客少且开门管控严，几乎无应激', s: 9 },
+    { t: '偶尔轻微应激，短时间内可自行平复', s: 7 },
+    { t: '访客较多、开门偶尔疏忽，猫咪容易紧张', s: 5 },
+    { t: '频繁严重应激、长期戒备恐慌拒动', s: 3 },
+  ]},
+  // —— 维度四：主人互动情感（3 题，高权重） ——
+  { q: '每日高质量陪伴互动时长？', maps: ['inter_time'], options: [
+    { t: '每日专心陪伴30分钟以上，全身心互动不敷衍', s: 9 },
+    { t: '每日15-30分钟有效陪伴，互动状态良好', s: 7 },
+    { t: '仅偶尔随手抚摸，几乎无专心陪伴时间', s: 5 },
+    { t: '长期零陪伴，日常互不互动、互不打扰', s: 3 },
+  ]},
+  { q: '与猫咪互动相处与犯错时的态度？', maps: ['inter_quality', 'inter_tolerance'], options: [
+    { t: '全程温柔尊重、不强迫呵斥，犯错耐心引导不体罚', s: 9 },
+    { t: '大多温和，偶尔轻微强行，犯错仅口头提醒', s: 7 },
+    { t: '偶尔强迫互动，犯错常大声呵斥或关禁闭', s: 5 },
+    { t: '经常强行抱拽呵斥，犯错频繁打骂体罚', s: 3 },
+  ]},
+  { q: '猫咪撒娇黏人时的回应与亲近频率？', maps: ['inter_affinity', 'inter_response'], options: [
+    { t: '及时察觉回应安抚，猫咪频繁主动贴贴呼噜', s: 9 },
+    { t: '有空会回应，猫咪愿意亲近、接受抚摸', s: 7 },
+    { t: '经常无视撒娇，猫咪仅觅食时靠近', s: 5 },
+    { t: '完全漠视驱赶，猫咪见人就躲、哈气抗拒', s: 3 },
+  ]},
+  // —— 维度五：娱乐丰容（2 题） ——
+  { q: '猫咪玩具、攀爬探索空间配置？', maps: ['play_toys', 'play_climb'], options: [
+    { t: '玩具丰富可轮换，有猫爬架、观景台，探索空间充足', s: 9 },
+    { t: '有2-3种专属玩具，有简易登高攀爬区域', s: 7 },
+    { t: '仅有单一玩具，无登高探索空间，环境单调', s: 5 },
+    { t: '无任何专属玩具，全屋平地无探索区域', s: 3 },
+  ]},
+  { q: '每日陪玩运动、精力释放情况？', maps: ['play_exercise'], options: [
+    { t: '每日规律逗猫，充分释放捕猎精力，运动量充足', s: 9 },
+    { t: '隔天陪玩，基本能满足日常运动需求', s: 7 },
+    { t: '极少陪玩，猫咪长期躺平、精力堆积', s: 5 },
+    { t: '完全不陪玩，猫咪严重缺乏运动', s: 3 },
+  ]},
+  // —— 维度六：健康护理（2 题） ——
+  { q: '猫咪日常身体护理情况？', maps: ['health_care'], options: [
+    { t: '定期梳毛、剪甲、洁耳，全套护理到位', s: 9 },
+    { t: '基础梳毛护理常态化，按需处理指甲耳朵', s: 7 },
+    { t: '护理极其随意，周期混乱，猫咪抗拒护理', s: 5 },
+    { t: '几乎零护理，毛发打结、指甲过长问题频发', s: 3 },
+  ]},
+  { q: '疫苗驱虫、体检就医与体态情绪状态？', maps: ['health_medical', 'health_condition'], options: [
+    { t: '按时疫苗驱虫、年度体检，体态标准、情绪稳定', s: 9 },
+    { t: '疫苗驱虫基本按时，体态正常，偶尔情绪低落', s: 7 },
+    { t: '疫苗驱虫经常拖延，体态微胖/偏瘦，情绪波动大', s: 5 },
+    { t: '长期不体检、不驱虫疫苗，体态异常、情绪抑郁暴躁', s: 3 },
+  ]},
+];
+
+const quizState = { current: 0, answers: new Array(QUIZ.length).fill(null), typeTimer: null, locked: false };
+
+function playClick() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!_audioCtx) _audioCtx = new Ctx();
+    const ctx = _audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.setValueAtTime(880, now);
+    o.frequency.exponentialRampToValueAtTime(660, now + 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(now); o.stop(now + 0.12);
+  } catch (e) { /* 静默忽略 */ }
+}
+
+function showQuiz() {
+  document.getElementById('quiz').classList.add('show');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUIZ[quizState.current];
+  const i = quizState.current;
+  quizState.locked = false;
+  if (quizState.typeTimer) { clearInterval(quizState.typeTimer); quizState.typeTimer = null; }
+
+  document.getElementById('quizProgress').textContent = `第 ${i + 1} / ${QUIZ.length} 题`;
+  document.getElementById('quizProgressFill').style.width = `${(i / QUIZ.length) * 100}%`;
+  document.getElementById('quizPrev').style.visibility = i === 0 ? 'hidden' : 'visible';
+
+  const textEl = document.getElementById('dialogText');
+  const optsEl = document.getElementById('dialogOptions');
+  optsEl.innerHTML = '';
+  textEl.textContent = '';
+  textEl.classList.add('typing');
+
+  let ci = 0;
+  quizState.typeTimer = setInterval(() => {
+    textEl.textContent += q.q[ci++];
+    if (ci >= q.q.length) {
+      clearInterval(quizState.typeTimer);
+      quizState.typeTimer = null;
+      textEl.classList.remove('typing');
+      renderOptions();
+    }
+  }, 34);
+}
+
+function renderOptions() {
+  const q = QUIZ[quizState.current];
+  const i = quizState.current;
+  const optsEl = document.getElementById('dialogOptions');
+  optsEl.innerHTML = '';
+  q.options.forEach((o, k) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn' + (quizState.answers[i] === k ? ' selected' : '');
+    btn.innerHTML = `<span class="key">${'ABCD'[k]}</span><span>${o.t}</span>`;
+    btn.addEventListener('click', () => selectOption(k));
+    optsEl.appendChild(btn);
+  });
+}
+
+function selectOption(k) {
+  if (quizState.locked) return;
+  quizState.locked = true;
+  quizState.answers[quizState.current] = k;
+  playClick();
+  const btns = document.querySelectorAll('#dialogOptions .option-btn');
+  btns.forEach((b, idx) => b.classList.toggle('selected', idx === k));
+  setTimeout(() => {
+    if (quizState.current < QUIZ.length - 1) {
+      quizState.current++;
+      renderQuestion();
+    } else {
+      finishQuiz();
+    }
+  }, 300);
+}
+
+function finishQuiz() {
+  // 同一指标可能被多题映射（如 diet_food 在 Q1/Q4），累加后取平均
+  const sums = {};
+  const counts = {};
+  QUIZ.forEach((q, i) => {
+    const k = quizState.answers[i];
+    const s = (k != null && q.options[k]) ? q.options[k].s : 5;
+    q.maps.forEach(key => {
+      sums[key] = (sums[key] || 0) + s;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  });
+  const scores = {};
+  Object.keys(sums).forEach(key => {
+    scores[key] = Math.round((sums[key] / counts[key]) * 10) / 10;
+  });
+  state.scores = scores;
+  document.getElementById('quiz').classList.remove('show');
+  analyze();
+}
+
+document.getElementById('quizPrev').addEventListener('click', () => {
+  if (quizState.current > 0) { quizState.current--; renderQuestion(); }
+});
+
+document.addEventListener('keydown', (e) => {
+  const quizEl = document.getElementById('quiz');
+  if (!quizEl.classList.contains('show')) return;
+  if (e.key === 'ArrowLeft' && quizState.current > 0) { quizState.current--; renderQuestion(); return; }
+  const map = { '1': 0, '2': 1, '3': 2, '4': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3, 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+  if (e.key in map && !quizState.typeTimer) selectOption(map[e.key]);
+});
+
+// 开始探索：猫咪从云朵掉进像素小屋 → 进入主页
+const intro = document.getElementById('intro');
+document.getElementById('btnStart').addEventListener('click', () => {
+  if (cat.mode === 'fall') return;
+  cat.mode = 'fall';
+  cat.fallT = 0;
+  cat.fallFromX = tops[cat.ci].x;
+  cat.fallFromY = tops[cat.ci].topY;
+  startBGM(); // 开始背景音乐
+  playMeow(); // 播放喵叫
+  // 飘出 "喵~"
+  const meow = document.createElement('div');
+  meow.className = 'meow-float';
+  meow.textContent = '喵~';
+  meow.style.left = cat.fallFromX + 'px';
+  meow.style.top = cat.fallFromY + 'px';
+  intro.appendChild(meow);
+  setTimeout(() => meow.remove(), 1100);
+  setTimeout(() => { intro.style.display = 'none'; showQuiz(); }, 1150);
+});
+
+const state = {
+  config: null,
+  scores: {},
+  charts: {},
+  timer: null,
+  resultData: null,
+};
+
+const R = 64, CIRC = 2 * Math.PI * R;
+document.getElementById('ringFill').style.strokeDasharray = CIRC;
+
+const GRADE_COLOR = {
+  'S级': '#f59e0b', 'A级': '#10b981', 'B级': '#3b82f6',
+  'C级': '#f97316', 'D级': '#ef4444', 'E级': '#b91c1c',
+};
+
+// 各评级对应的「猫咪评语」（漫画对话框）
+const GRADE_COMMENTS = {
+  'S级': '我超级超级幸福！主人把我的饮食、生活、情绪都照顾得无微不至，我完全信任这个家，每天都想黏着主人撒娇，这里就是我最安心、最温暖的专属小天地',
+  'A级': '我过得特别开心！主人很爱我，生活的方方面面都很舒适，几乎没有让我不安的地方，只有一点点小细节可以更完美，我超爱我的主人和这个家',
+  'B级': '我在家里过得很舒服，主人对我很好，基本需求都能被满足。只是偶尔会有一点点小不安和小遗憾，如果主人能优化小细节，我会更幸福哦',
+  'C级': '我能正常生活，但幸福感一般。家里还有不少让我紧张、不自在的地方，主人的陪伴和照顾也不够充足，我偶尔会觉得孤单、没有安全感',
+  'D级': '我在这里过得并不开心，经常感到焦虑、害怕、孤单。主人很少陪伴我，生活环境也有很多不适，我慢慢变得不爱亲近人，总是想躲起来独处',
+  'E级': '我长期处于焦虑和压抑中，这个家让我没有丝毫安全感，我恐惧、抗拒这里的环境和相处模式，长期情绪低落，很难感受到温暖和爱意',
+};
+
+async function fetchConfig() {
+  const res = await fetch('/api/config');
+  state.config = await res.json();
+  // 等待测评完成，由 finishQuiz() 触发 analyze() 生成结果
+}
+
+
+// 各评级对应的「立绘海报」图片（S2.png = S级立绘；仅 S 级先接入）
+const GRADE_POSTER = {
+  'S级': { src: '/static/poster/S1.png' },
+  'A级': { src: '/static/poster/S1.png' },
+  'B级': { src: '/static/poster/A2.png' },
+  'C级': { src: '/static/poster/B2.png' },
+  'D级': { src: '/static/poster/C2.png' },
+  'E级': { src: '/static/poster/E2.png' },
+};
+
+async function analyze() {
+  const res = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scores: state.scores }),
+  });
+  const data = await res.json();
+  if (data.error) { console.error(data.error); return; }
+  state.resultData = data;
+  const gradeKey = data.grade_level.split(' ')[0];
+  // 有对应海报的等级 → 先进入黑幕海报环节，点击「查看报告」后再渲染结果
+  if (GRADE_POSTER[gradeKey]) {
+    showPoster(gradeKey);
+  } else {
+    renderResult(data);
+  }
+}
+
+function showPoster(gradeKey) {
+  const poster = GRADE_POSTER[gradeKey];
+  document.getElementById('posterImg').src = poster.src;
+  document.getElementById('posterImg').alt = `${gradeKey} 立绘海报`;
+  document.getElementById('posterOverlay').classList.add('show');
+}
+
+document.getElementById('btnViewReport').addEventListener('click', () => {
+  document.getElementById('posterOverlay').classList.remove('show');
+  if (state.resultData) renderResult(state.resultData);
+});
+
+function renderResult(data) {
+  // 圆环
+  const total = data.total;
+  document.getElementById('totalNum').textContent = total;
+  const offset = CIRC * (1 - total / 100);
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+
+  // 等级徽章
+  const badge = document.getElementById('gradeBadge');
+  const gradeKey = data.grade_level.split(' ')[0];
+  state.gradeKey = gradeKey;
+  badge.style.background = GRADE_COLOR[gradeKey] || '#f97316';
+  badge.innerHTML = `<span class="tag">综合评级</span>${data.grade_level}`;
+  document.getElementById('gradeDesc').textContent = data.grade_desc;
+
+  // A级及以上 → 礼花筒庆祝
+  if (gradeKey === 'A级' || gradeKey === 'S级') {
+    setTimeout(launchConfetti, 450);
+  }
+
+  // 猫咪从天空坠落 → 落地 → 弹出评语漫画对话框
+  const catLand = document.getElementById('catLand');
+  const catImg = document.getElementById('catFallImg');
+  document.getElementById('catComment').textContent = GRADE_COMMENTS[gradeKey] || '喵~';
+  catImg.src = '/static/_frames/cat2.png';
+  catLand.classList.remove('drop');
+  void catLand.offsetWidth; // 强制回流以重启动画
+  catLand.classList.add('drop');
+  setTimeout(() => { catImg.src = '/static/_frames/cat3.png'; }, 600);
+
+  // 优化预测
+  const proj = document.getElementById('projection');
+  if (data.weak_indicators.length > 0) {
+    proj.style.display = 'block';
+    proj.innerHTML = `落实改进方案后，预计综合指数提升至 <b>${data.projected_total}</b> 分（+${data.projected_delta} 分）`;
+  } else {
+    proj.style.display = 'none';
+  }
+
+  // 图表
+  const labels = data.dimensions.map(d => d.name);
+  const current = data.dimensions.map(d => d.average);
+  const projected = data.dimensions.map(d => Math.min(10, d.projected));
+
+  if (!state.charts.radar) {
+    state.charts.radar = new Chart(document.getElementById('radarChart'), {
+      type: 'radar',
+      data: {
+        labels,
+        datasets: [
+          { label: '当前', data: current, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.18)', borderWidth: 2, pointBackgroundColor: '#f97316' },
+          { label: '优化后', data: projected, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.08)', borderWidth: 2, borderDash: [5,4], pointBackgroundColor: '#10b981' },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, color: '#9a8b85' }, grid: { color: '#f3e6da' }, angleLines: { color: '#f3e6da' }, pointLabels: { color: '#3b2f2f', font: { size: 12, weight: 'bold' } } } },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true } } },
+      },
+    });
+  } else {
+    state.charts.radar.data.datasets[0].data = current;
+    state.charts.radar.data.datasets[1].data = projected;
+    state.charts.radar.update();
+  }
+
+  if (!state.charts.bar) {
+    state.charts.bar = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: '维度平均分', data: current, backgroundColor: labels.map(() => '#f97316'), borderRadius: 8, maxBarThickness: 44 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 10, ticks: { stepSize: 2 } }, x: { ticks: { color: '#6b5b52', font: { size: 11 } } } },
+        plugins: { legend: { display: false } },
+      },
+    });
+  } else {
+    state.charts.bar.data.datasets[0].data = current;
+    state.charts.bar.update();
+  }
+
+  // 短板列表
+  renderWeak(data.weak_indicators);
+}
+
+function renderWeak(weak) {
+  const wrap = document.getElementById('weakList');
+  if (!weak.length) {
+    wrap.innerHTML = '<div class="empty-tip">🎉 未发现低于 7 分的短板指标，猫咪满意度表现全面良好！</div>';
+    return;
+  }
+  wrap.innerHTML = weak.map(w => `
+    <div class="weak-item">
+      <div class="weak-top">
+        <span class="weak-name">${w.name}</span>
+        <span class="weak-cat">${w.category}</span>
+        <span class="weak-score" style="color:${w.score < 5 ? 'var(--red)' : 'var(--gold)'}">${w.score} 分</span>
+      </div>
+      <div class="weak-meta">${w.dimension_name} · ${w.band}</div>
+      <div class="tip-grid">
+        <div><span class="k">频次</span> ${w.tips.freq}</div>
+        <div><span class="k">方法</span> ${w.tips.method}</div>
+        <div><span class="k">周期</span> ${w.tips.period}</div>
+        <div><span class="k">预期</span> ${w.tips.effect}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ---------- 按钮 ----------
+document.getElementById('btnReport').addEventListener('click', async () => {
+  const res = await fetch('/api/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scores: state.scores }),
+  });
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'cat_satisfaction_report.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---------- 证书 ----------
+const GRADE_CERT = {
+  'S级': { src: '/static/certificates/S.png', file: 'S级-猫咪家庭满意度证书.png' },
+  'A级': { src: '/static/certificates/A.png', file: 'A级-猫咪家庭满意度证书.png' },
+  'B级': { src: '/static/certificates/B.png', file: 'B级-猫咪家庭满意度证书.png' },
+  'C级': { src: '/static/certificates/C.png', file: 'C级-猫咪家庭满意度证书.png' },
+  'D级': { src: '/static/certificates/D.png', file: 'D级-猫咪家庭满意度证书.png' },
+  'E级': { src: '/static/certificates/E.png', file: 'E级-猫咪家庭满意度证书.png' },
+};
+const certModal = document.getElementById('certModal');
+const certImg = document.getElementById('certImg');
+const certHint = document.getElementById('certHint');
+const btnCertSave = document.getElementById('btnCertSave');
+
+document.getElementById('btnCert').addEventListener('click', () => {
+  const gk = state.gradeKey;
+  if (!gk) { certHint.textContent = '请先完成测评，再领取等级证书～'; return; }
+  const cert = GRADE_CERT[gk];
+  if (!cert) { certHint.textContent = `${gk} 等级证书正在制作中，敬请期待～`; return; }
+  certHint.textContent = `恭喜获得 ${gk} 认证！`;
+  certImg.src = cert.src;
+  btnCertSave.href = cert.src;
+  btnCertSave.download = cert.file;
+  certModal.classList.add('show');
+});
+
+document.getElementById('certClose').addEventListener('click', () => certModal.classList.remove('show'));
+document.getElementById('certBackdrop').addEventListener('click', () => certModal.classList.remove('show'));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') certModal.classList.remove('show'); });
+
+// ---------- 礼花筒（A级及以上） ----------
+const confettiCanvas = document.getElementById('confettiCanvas');
+const cctx = confettiCanvas.getContext('2d');
+const CONFETTI_COLORS = ['#f97316', '#fbbf24', '#10b981', '#38bdf8', '#f43f5e', '#a78bfa', '#facc15', '#fb7185'];
+let confettiParts = [];
+let confettiRunning = false;
+
+function resizeConfetti() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+// 礼花筒音效：震耳“砰”爆破 + 上行号角 + 人群欢呼（Web Audio 合成）
+function playPartyHorn() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!_audioCtx) _audioCtx = new Ctx();
+    const ctx = _audioCtx;
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+
+    // 1) 三连“砰”爆破：低通噪声 + 次低音重击，更厚重震撼
+    for (let k = 0; k < 3; k++) {
+      const t = now + k * 0.11;
+      const dur = 0.32;
+      // 噪声爆破（主爆裂声）
+      const bufLen = Math.floor(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 2.2);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 3600;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.85, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(ctx.destination);
+      src.start(t);
+      // 次低音重击（150Hz → 45Hz 下坠）
+      const sub = ctx.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(150, t);
+      sub.frequency.exponentialRampToValueAtTime(45, t + dur);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0.6, t);
+      sg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      sub.connect(sg); sg.connect(ctx.destination);
+      sub.start(t); sub.stop(t + dur + 0.02);
+    }
+
+    // 2) 上行号角滑音（双八度叠加，更嘹亮）
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const t = now + 0.03 + i * 0.09;
+      [freq, freq * 2].forEach(ff => {
+        const o = ctx.createOscillator();
+        o.type = 'square';
+        o.frequency.setValueAtTime(ff, t);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(ff === freq ? 0.32 : 0.14, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(t); o.stop(t + 0.24);
+      });
+    });
+
+    // 3) 人群欢呼：多声部带通噪声叠加 + 哨音滑音，模拟“哇~~~”
+    const cheerDur = 1.5;
+    const cheerBufLen = Math.floor(ctx.sampleRate * cheerDur);
+    for (let v = 0; v < 14; v++) {
+      const cbuf = ctx.createBuffer(1, cheerBufLen, ctx.sampleRate);
+      const cd = cbuf.getChannelData(0);
+      for (let i = 0; i < cheerBufLen; i++) cd[i] = Math.random() * 2 - 1;
+      const csrc = ctx.createBufferSource();
+      csrc.buffer = cbuf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = 1.1;
+      const baseF = 650 + Math.random() * 1300;
+      bp.frequency.setValueAtTime(baseF, now);
+      bp.frequency.exponentialRampToValueAtTime(baseF * (0.85 + Math.random() * 0.4), now + cheerDur);
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(0.0001, now);
+      cg.gain.exponentialRampToValueAtTime(0.05 + Math.random() * 0.045, now + 0.22);
+      cg.gain.setValueAtTime(0.05 + Math.random() * 0.045, now + 0.55);
+      cg.gain.exponentialRampToValueAtTime(0.0001, now + cheerDur);
+      csrc.connect(bp); bp.connect(cg); cg.connect(ctx.destination);
+      csrc.start(now);
+    }
+    // 欢呼中的口哨声（正弦上下滑音，模仿“咻——哟！”）
+    for (let w = 0; w < 3; w++) {
+      const t = now + 0.05 + w * 0.14;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      const f0 = 1800 + Math.random() * 600;
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f0 * 1.4, t + 0.12);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + 0.3);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.06, t + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + 0.4);
+    }
+  } catch (e) { /* 静默忽略音频错误 */ }
+}
+
+function launchConfetti() {
+  resizeConfetti();
+  playPartyHorn();
+  // 两门礼花筒：左下、右下向上喷射
+  const origins = [
+    { x: confettiCanvas.width * 0.08, y: confettiCanvas.height * 0.92, angle: -Math.PI / 2.5 },
+    { x: confettiCanvas.width * 0.92, y: confettiCanvas.height * 0.92, angle: -Math.PI / 1.65 },
+  ];
+  confettiParts = [];
+  const count = 280;
+  for (let i = 0; i < count; i++) {
+    const o = origins[i % 2];
+    const speed = Math.random() * 15 + 9;
+    const angle = o.angle + (Math.random() - 0.5) * 0.9;
+    confettiParts.push({
+      x: o.x + (Math.random() - 0.5) * 20,
+      y: o.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: Math.random() * 8 + 5,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.4,
+      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+      life: Math.random() * 70 + 110,
+      age: 0,
+    });
+  }
+  if (!confettiRunning) {
+    confettiRunning = true;
+    requestAnimationFrame(confettiTick);
+  }
+}
+
+function confettiTick() {
+  cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  confettiParts.forEach(p => {
+    p.age++;
+    p.vy += 0.18;
+    p.vx *= 0.99;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+    const alpha = Math.max(0, 1 - p.age / p.life);
+    cctx.save();
+    cctx.globalAlpha = alpha;
+    cctx.translate(p.x, p.y);
+    cctx.rotate(p.rot);
+    cctx.fillStyle = p.color;
+    if (p.shape === 'rect') {
+      cctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+    } else {
+      cctx.beginPath();
+      cctx.arc(0, 0, p.size / 3, 0, Math.PI * 2);
+      cctx.fill();
+    }
+    cctx.restore();
+  });
+  confettiParts = confettiParts.filter(p => p.age < p.life && p.y < confettiCanvas.height + 40);
+  if (confettiParts.length > 0) {
+    requestAnimationFrame(confettiTick);
+  } else {
+    cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    confettiRunning = false;
+  }
+}
+
+fetchConfig();
+</script>
+</body>
+</html>
